@@ -16,10 +16,29 @@ HEADERS = {"User-Agent" : "Mozilla/5.0 (Windows; U; Windows NT 5.1; ru; rv:1.9.1
        "Connection" : "Keep-Alive"}
 PROXY=None
 timeout=60
-SEARCHURL = "http://subscene.com/subtitles/release?q="
+ROOTURL = "http://subscene.com"
+SEARCHURL = "/subtitles/release?q="
+def levenshtein(s, t):
+    ''' From Wikipedia article; Iterative with two matrix rows. '''
+    if s == t: return 0
+    elif len(s) == 0: return len(t)
+    elif len(t) == 0: return len(s)
+    v0 = [None] * (len(t) + 1)
+    v1 = [None] * (len(t) + 1)
+    for i in range(len(v0)):
+        v0[i] = i
+    for i in range(len(s)):
+        v1[0] = i + 1
+        for j in range(len(t)):
+            cost = 0 if s[i] == t[j] else 1
+            v1[j + 1] = min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost)
+        for j in range(len(v0)):
+            v0[j] = v1[j]
+    
+    return v1[len(t)]
 
-def parse_page_subs(page_str_about):
-    page_str_about = re.sub('[^a-zA-Z0-9]', ' ', page_str_about)
+def parsePage(pageStr):
+    print pageStr
     slovar={}
     global timeout
     socket.setdefaulttimeout(timeout)
@@ -27,27 +46,69 @@ def parse_page_subs(page_str_about):
             proxy_handler = urllib2.ProxyHandler( { "http": "http://"+PROXY+"/" } )
             opener = urllib2.build_opener(proxy_handler)
             urllib2.install_opener(opener)
-    openURL = SEARCHURL+urllib.quote_plus(page_str_about)
-    print openURL
-    #openURL = "http://subscene.com/subtitles/release?q=jurrasic.park"
-    page_request = urllib2.Request(url=openURL, headers=HEADERS)
+    page_request = urllib2.Request(url=pageStr, headers=HEADERS)
     try:
         page_zapr = urllib2.urlopen(url=page_request)
-        print "Page reading ... %s"
+#         print "Page reading ... %s"
         page=page_zapr.read()
     except Exception ,error:
         print str(error)
         res=False
         return res,slovar
     soup = BeautifulSoup(page)
-    relevant = []
+    return soup
+
+def parse_page_subs(subStr):
+    subStr = re.sub('[^a-zA-Z0-9]', ' ', subStr)
+    relevant = ""
+    openURL = ROOTURL + SEARCHURL + urllib.quote_plus(subStr)
+#     print openURL
+    #openURL = "http://subscene.com/subtitles/release?q=jurrasic.park"
+    soup = parsePage(openURL)
+    minDist = len(subStr)
     for link in soup.findAll('a'): # find all links
         internalCheckSub = link['href'][:4]
         if not internalCheckSub == "http" and "english" in link['href']:
-            relevant.append((link['href'],link("span")[1](text=True)[0]))
+            nameOfSubs = link("span")[1](text=True)[0].strip()
+            nameOfSubs = re.sub('[^a-zA-Z0-9]', ' ', nameOfSubs)
+            distCurr = levenshtein(nameOfSubs, subStr)
+            if(distCurr < minDist):
+                relevant= link['href']
+                minDist = distCurr
 #             pprint.pprint(link)
 #             print link['href']
-            print(link("span")[1](text=True)[0])
+#             print(link("span")[1](text=True)[0])
+    return relevant
+
+def getSubsFrom(pageStr):
+    soup1 = parsePage(pageStr)
+#     pprint.pprint(soup)
+    titleLink = soup1.find("a", {"id": "downloadButton"})
+    pprint.pprint(titleLink['href'])
+    url = ROOTURL + titleLink['href']
+
+    file_name = url.split('/')[-1]
+    u = urllib2.urlopen(url)
+    f = open(file_name, 'wb')
+    meta = u.info()
+    file_size = int(meta.getheaders("Content-Length")[0])
+    print "Downloading: %s Bytes: %s" % (file_name, file_size)
+    
+    file_size_dl = 0
+    block_sz = 8192
+    while True:
+        buffer = u.read(block_sz)
+        if not buffer:
+            break
+    
+        file_size_dl += len(buffer)
+        f.write(buffer)
+        status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
+        status = status + chr(8)*(len(status)+1)
+        print status,
+    
+    f.close()
+    
 
 def populateToParseList(fileName, getSubsFor, mediaFilesArray):
     splitName = split(fileName,'.')
@@ -68,4 +129,7 @@ else:
     populateToParseList(toParse, getSubsFor, mediaFilesArray)
 
 for singleSub in getSubsFor:
-    parse_page_subs(singleSub)
+    subsOnPage = parse_page_subs(singleSub)
+    subsOnURL = ROOTURL + subsOnPage
+    getSubsFrom(subsOnURL)
+    
