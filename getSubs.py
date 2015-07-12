@@ -6,6 +6,7 @@ import os
 from string import split
 import re
 import urllib
+import zipfile
 import pprint
 
 HEADERS = {"User-Agent" : "Mozilla/5.0 (Windows; U; Windows NT 5.1; ru; rv:1.9.1.5) Gecko/20091102 Firefox/3.5.5",
@@ -80,14 +81,14 @@ def parse_page_subs(subStr):
 #             print(link("span")[1](text=True)[0])
     return relevant
 
-def getSubsFrom(pageStr):
+def getSubsFrom(pageStr, saveDir):
     soup1 = parsePage(pageStr)
 #     pprint.pprint(soup)
     titleLink = soup1.find("a", {"id": "downloadButton"})
     pprint.pprint(titleLink['href'])
     url = ROOTURL + titleLink['href']
 
-    file_name = url.split('/')[-1]
+    file_name = saveDir + url.split('/')[-1] + ".zip"
     u = urllib2.urlopen(url)
     f = open(file_name, 'wb')
     meta = u.info()
@@ -108,14 +109,20 @@ def getSubsFrom(pageStr):
         print status,
     
     f.close()
-    
+    zfile = zipfile.ZipFile(file_name)
+    for name in zfile.namelist():
+        (dirname, filename) = os.path.split(name)
+        print (dirname, filename)
+        print "Decompressing " + filename + " on " + saveDir
+#         if not os.path.exists(dirname):
+#             os.makedirs(dirname)
+        zfile.extract(name, saveDir)
+    os.remove(file_name)
 
 def populateToParseList(fileName, getSubsFor, mediaFilesArray):
-    splitName = split(fileName,'.')
-    mediatype = splitName[len(splitName)-1]
+    mediatype = fileName.split('.')[-1]
     if mediatype in mediaFilesArray:
-        fileDirectoryArray = split(fileName,'/')
-        getSubsFor.append(fileDirectoryArray[len(fileDirectoryArray)-1])
+        getSubsFor.append(fileName.split('/')[-1])
 
 getSubsFor = []
 mediaFilesArray = ["mp4", "mkv", "avi"]
@@ -127,9 +134,10 @@ if os.path.isdir(toParse):
             populateToParseList(fname, getSubsFor, mediaFilesArray)
 else:
     populateToParseList(toParse, getSubsFor, mediaFilesArray)
-
+saveInDir = toParse[:toParse.rfind('/')+1]
+# print saveInDir
 for singleSub in getSubsFor:
     subsOnPage = parse_page_subs(singleSub)
     subsOnURL = ROOTURL + subsOnPage
-    getSubsFrom(subsOnURL)
+    getSubsFrom(pageStr=subsOnURL, saveDir=saveInDir)
     
