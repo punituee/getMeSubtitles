@@ -3,7 +3,7 @@ Code searches for subs on subscene.com and gets the closest matching one to the 
 Uses beautifulsoup to parse the webpage
 Uses levenshtein distance to get the closest match with the movie title and substitle's file name
 
-
+Note: I developed this project for personal use, and as a learning exercise. I acknowledge that websites need visitors for revenue and bots like this should be used only in dire circumstances. 
 
 ## License
 
