@@ -1,4 +1,4 @@
-## getMeSubtitles
+# getMeSubtitles
 Code searches for subs on subscene.com and gets the closest matching one to the same folder that the movie is present in.
 Uses beautifulsoup to parse the webpage
 Uses levenshtein distance to get the closest match with the movie title and substitle's file name
